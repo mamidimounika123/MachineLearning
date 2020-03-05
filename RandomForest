@@ -1,1 +1,174 @@
 
+#!/usr/bin/env python
+# coding: utf-8
+
+
+
+import pandas as pd
+import numpy as np 
+from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
+from IPython.display import Image 
+
+playstoredata = pd.read_csv('googleplaystore.csv')
+playstoredata.head()
+print(playstoredata.dtypes)
+
+
+print(playstoredata.isnull().sum())
+
+
+playstoredata.dropna(axis =0,inplace = True)
+
+
+def Install(installs):
+    installs = installs.strip('+')
+    installs = installs.replace(',','')
+    return int(installs)
+
+
+
+playstoredata['Installs'] = playstoredata['Installs'].apply(lambda ins:Install(ins))
+
+
+
+playstoredata.dropna(axis =0,inplace = True)
+
+
+
+def Size(size):
+    if  'M' in size:
+        size =size.replace('M','')
+        size = float(size) * 1048576
+        return(size)
+    elif 'k' in size:
+        size = size.replace('k','')
+        size = float(size) * 1024
+        return(size)
+    else:
+        return None
+
+
+playstoredata['Size'] = playstoredata['Size'].apply(lambda siz: Size(siz))
+
+
+
+playstoredata.dropna(axis =0,inplace = True)
+
+
+category = pd.get_dummies(playstoredata['Category'],prefix='Ct')
+Type = pd.get_dummies(playstoredata['Type'],prefix='ty')
+content_rating = pd.get_dummies(playstoredata['Content Rating'],prefix='Cr')
+Geners_rating = pd.get_dummies(playstoredata['Genres'],prefix = 'Grs')
+
+
+
+playstoredata['Rating'] = playstoredata['Rating'].apply(lambda rat:round(rat))
+
+
+
+print(playstoredata['Rating'].value_counts())
+
+
+
+Target = playstoredata['Rating'].values
+Reviews = playstoredata['Reviews']
+Installs = playstoredata['Installs']
+
+final_df = [category,Type,content_rating,Geners_rating,Reviews,Installs]
+Concated_df = pd.concat(final_df,axis =1)
+
+
+
+print(Concated_df.shape)
+
+
+
+from sklearn.preprocessing import MinMaxScaler
+
+
+
+
+Min_Max_Scaler = MinMaxScaler()
+
+
+
+
+transoformed_df = Min_Max_Scaler.fit_transform(Concated_df)
+
+
+
+
+tnsf_df = pd.DataFrame(transoformed_df)
+
+
+
+X_train,X_test,y_train,y_test = train_test_split(transoformed_df,Target,random_state = 3,test_size = 0.2)
+
+
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+import graphviz 
+from sklearn import tree
+from sklearn.model_selection import cross_val_score, cross_val_predict
+from sklearn import metrics
+
+from sklearn.tree import export_graphviz
+from sklearn.externals.six import StringIO  
+import pydotplus
+
+
+
+
+DecisionTree = DecisionTreeClassifier(criterion='entropy')
+DecisionTree.fit(X_train,y_train)
+DecisionTree_Preds = DecisionTree.predict(X_test)
+dot_data = StringIO()
+export_graphviz(DecisionTree, out_file=dot_data,  
+                filled=True, rounded=True,
+                special_characters=True,feature_names = Concated_df.columns,class_names=['1','2','3','4','5'])
+graph = pydotplus.graph_from_dot_data(dot_data) 
+graph.write_jpg('Decisionfile.jpg')
+
+
+RadndomClassifier = RandomForestClassifier()
+
+
+accuracy_score(y_test,DecisionTree_Preds)
+RadndomClassifier.fit(X_train,y_train)
+Random_preds = RadndomClassifier.predict(X_test)
+accuracy_score(y_test,Random_preds)
+
+
+RandomCls = RandomForestClassifier(n_estimators=1000,ccp_alpha=1)
+RandomCls.fit(X_train,y_train)
+RandomCls_preds = RandomCls.predict(X_test)
+accuracy_score(y_test,RandomCls_preds)
+
+
+DTCost = DecisionTreeClassifier(max_depth=5 ,ccp_alpha =1,criterion='entropy')
+DTCost.fit(X_train,y_train)
+DTcost_pred = DTCost.predict(X_test)
+accuracy_score(y_test,DTcost_pred)
+
+from sklearn.model_selection import KFold 
+kf = KFold(n_splits=5, random_state=2) 
+
+
+for trainindex, testindex in kf.split(transoformed_df):
+    cv_X_train, cv_X_test = transoformed_df[trainindex], transoformed_df[testindex]
+    cv_y_train, cv_y_test = Target[trainindex], Target[testindex]
+
+
+DClassifier = DecisionTreeClassifier(criterion='entropy')
+DClassifier.fit(cv_X_train,cv_y_train)
+cv_Tree_preds = DClassifier.predict(cv_X_test)
+accuracy_score(cv_y_test,cv_Tree_preds)
+
+
+DCler = DecisionTreeClassifier(criterion='entropy',max_depth=5 ,ccp_alpha =1)
+DCler.fit(cv_X_train,cv_y_train)
+DClr_preds = DCler.predict(cv_X_test)
+accuracy_score(cv_y_test,DClr_preds)
+
